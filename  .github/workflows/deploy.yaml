@@ -1,0 +1,88 @@
+name: Deploy Monorepo to Azure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/deploy.yml'
+
+env:
+  ACR_NAME: stockanalyzeracr
+  ACR_LOGIN_SERVER: stockanalyzeracr.azurecr.io
+  BACKEND_IMAGE: stock-backend
+  FRONTEND_IMAGE: stock-frontend
+  BACKEND_WEBAPP: stock-analyzer-api
+  FRONTEND_WEBAPP: stock-analyzer-ui
+  RESOURCE_GROUP: stock-analyzer-rg
+
+jobs:
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, '[backend]') || github.event_name == 'push' && github.event.commits.*.modified | join(' ') | contains('backend/')
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in to ACR
+        run: az acr login --name $ACR_NAME
+
+      - name: Build and Push Backend Docker Image
+        run: |
+          docker build -t $ACR_LOGIN_SERVER/$BACKEND_IMAGE:latest ./backend
+          docker push $ACR_LOGIN_SERVER/$BACKEND_IMAGE:latest
+
+      - name: Deploy Backend to Web App
+        run: |
+          az webapp config container set \
+            --name $BACKEND_WEBAPP \
+            --resource-group $RESOURCE_GROUP \
+            --docker-custom-image-name $ACR_LOGIN_SERVER/$BACKEND_IMAGE:latest \
+            --docker-registry-server-url https://$ACR_LOGIN_SERVER \
+            --docker-registry-server-user ${{ secrets.ACR_USERNAME }} \
+            --docker-registry-server-password ${{ secrets.ACR_PASSWORD }}
+
+          az webapp restart \
+            --name $BACKEND_WEBAPP \
+            --resource-group $RESOURCE_GROUP
+
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, '[frontend]') || github.event_name == 'push' && github.event.commits.*.modified | join(' ') | contains('frontend/')
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in to ACR
+        run: az acr login --name $ACR_NAME
+
+      - name: Build and Push Frontend Docker Image
+        run: |
+          docker build -t $ACR_LOGIN_SERVER/$FRONTEND_IMAGE:latest ./frontend
+          docker push $ACR_LOGIN_SERVER/$FRONTEND_IMAGE:latest
+
+      - name: Deploy Frontend to Web App
+        run: |
+          az webapp config container set \
+            --name $FRONTEND_WEBAPP \
+            --resource-group $RESOURCE_GROUP \
+            --docker-custom-image-name $ACR_LOGIN_SERVER/$FRONTEND_IMAGE:latest \
+            --docker-registry-server-url https://$ACR_LOGIN_SERVER \
+            --docker-registry-server-user ${{ secrets.ACR_USERNAME }} \
+            --docker-registry-server-password ${{ secrets.ACR_PASSWORD }}
+
+          az webapp restart \
+            --name $FRONTEND_WEBAPP \
+            --resource-group $RESOURCE_GROUP
