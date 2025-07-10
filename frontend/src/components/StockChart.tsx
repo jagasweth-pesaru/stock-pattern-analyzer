@@ -42,7 +42,7 @@ export default function StockChart({ symbol }: Props) {
 
   return (
     <div className="p-4">
-      <h2 className="text-xl font-bold mb-2">Test</h2>
+      <h4 className="text-xl font-bold mb-2">Test</h4>
       <h2 className="text-xl font-bold mb-2">{symbol.toUpperCase()}</h2>
       <p className="mb-4 text-green-700 font-semibold">Signal: {signal}</p>
 
