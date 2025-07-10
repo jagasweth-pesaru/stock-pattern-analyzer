@@ -29,7 +29,7 @@ export default function StockChart({ symbol }: Props) {
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await axios.get(`http://127.0.0.1:8000/stock/${symbol}`);
+        const res = await axios.get(`https://stock-analyzer-api.azurewebsites.net/stock/${symbol}`);
         setData(res.data.data);
         setSignal(res.data.pattern_signal);
       } catch (error) {
