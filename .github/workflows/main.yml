@@ -6,7 +6,7 @@ on:
     paths:
       - 'frontend/**'
       - 'backend/**'
-  workflow_dispatch:  # manual trigger
+  workflow_dispatch:
 
 jobs:
   detect-changes:
@@ -73,14 +73,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          dotnet-version: '8.0.x'
+          python-version: '3.11'
 
-      - name: Publish backend
+      - name: Install backend dependencies
         run: |
-          dotnet publish -c Release -o out
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Log in to Azure Container Registry
         uses: azure/docker-login@v1
