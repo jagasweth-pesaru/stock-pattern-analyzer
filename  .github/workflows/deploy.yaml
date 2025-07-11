@@ -9,6 +9,13 @@ on:
       - 'frontend/**'
       - '.github/workflows/deploy.yml'
 
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to deploy (backend, frontend, all)'
+        required: true
+        default: 'all'
+
 env:
   ACR_NAME: stockanalyzeracr
   ACR_LOGIN_SERVER: stockanalyzeracr.azurecr.io
@@ -22,16 +29,22 @@ jobs:
   deploy-backend:
     name: Deploy Backend
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.message, '[backend]') || github.event_name == 'push' && github.event.commits.*.modified | join(' ') | contains('backend/')
+    if: |
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'backend' || github.event.inputs.service == 'all') ||
+      github.event_name == 'push' && (
+        contains(join(github.event.commits.*.modified, ' '), 'backend/') ||
+        contains(join(github.event.commits.*.added, ' '), 'backend/')
+      )
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Log in to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Log in to ACR
+      - name: Log in to Azure Container Registry
         run: az acr login --name $ACR_NAME
 
       - name: Build and Push Backend Docker Image
@@ -39,7 +52,7 @@ jobs:
           docker build -t $ACR_LOGIN_SERVER/$BACKEND_IMAGE:latest ./backend
           docker push $ACR_LOGIN_SERVER/$BACKEND_IMAGE:latest
 
-      - name: Deploy Backend to Web App
+      - name: Deploy Backend to Azure Web App
         run: |
           az webapp config container set \
             --name $BACKEND_WEBAPP \
@@ -49,23 +62,27 @@ jobs:
             --docker-registry-server-user ${{ secrets.ACR_USERNAME }} \
             --docker-registry-server-password ${{ secrets.ACR_PASSWORD }}
 
-          az webapp restart \
-            --name $BACKEND_WEBAPP \
-            --resource-group $RESOURCE_GROUP
+          az webapp restart --name $BACKEND_WEBAPP --resource-group $RESOURCE_GROUP
 
   deploy-frontend:
     name: Deploy Frontend
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.message, '[frontend]') || github.event_name == 'push' && github.event.commits.*.modified | join(' ') | contains('frontend/')
+    if: |
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'frontend' || github.event.inputs.service == 'all') ||
+      github.event_name == 'push' && (
+        contains(join(github.event.commits.*.modified, ' '), 'frontend/') ||
+        contains(join(github.event.commits.*.added, ' '), 'frontend/')
+      )
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Log in to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Log in to ACR
+      - name: Log in to Azure Container Registry
         run: az acr login --name $ACR_NAME
 
       - name: Build and Push Frontend Docker Image
@@ -73,7 +90,7 @@ jobs:
           docker build -t $ACR_LOGIN_SERVER/$FRONTEND_IMAGE:latest ./frontend
           docker push $ACR_LOGIN_SERVER/$FRONTEND_IMAGE:latest
 
-      - name: Deploy Frontend to Web App
+      - name: Deploy Frontend to Azure Web App
         run: |
           az webapp config container set \
             --name $FRONTEND_WEBAPP \
@@ -83,6 +100,4 @@ jobs:
             --docker-registry-server-user ${{ secrets.ACR_USERNAME }} \
             --docker-registry-server-password ${{ secrets.ACR_PASSWORD }}
 
-          az webapp restart \
-            --name $FRONTEND_WEBAPP \
-            --resource-group $RESOURCE_GROUP
+          az webapp restart --name $FRONTEND_WEBAPP --resource-group $RESOURCE_GROUP
